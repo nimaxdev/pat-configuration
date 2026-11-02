@@ -18,7 +18,7 @@
 		}
 	},
 	"require": {
-		"php": ">=4.0.0",
+		"php": ">=7.4",
 		"pear/pear-core-minimal": "^1.0",
 		"nimaxdev/pat-error":  "^1.2.1"
 	},

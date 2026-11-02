@@ -78,6 +78,13 @@ class patConfiguration_Reader_XML extends patConfiguration_Reader
     public $data = array();
 
     /**
+     * CDATA of the tag, that has been closed last
+     *
+     * @var string|null
+     */
+    public $currentData;
+
+    /**
      * all open files
      *
      * @var array
@@ -111,6 +118,13 @@ class patConfiguration_Reader_XML extends patConfiguration_Reader
      * @var array
      */
     public $defineStack = array();
+
+    /**
+     * tags defined by <define> per namespace
+     *
+     * @var array|null
+     */
+    public $definedTags;
 
     /**
      * files that have been included
@@ -399,17 +413,18 @@ class patConfiguration_Reader_XML extends patConfiguration_Reader
         //  get the data of the current tag
         $tagDepth = count($this->tagStack);
 
-        $this->currentData = $this->data[$tagDepth];
+        // a tag without CDATA has no entry
+        $this->currentData = isset($this->data[$tagDepth]) ? $this->data[$tagDepth] : null;
 
         switch ($whitespace) {
             case 'preserve':
                 break;
             case 'strip':
-                $this->currentData = trim(preg_replace('/\s\s*/', ' ', $this->currentData));
+                $this->currentData = trim(preg_replace('/\s\s*/', ' ', (string)$this->currentData));
                 break;
             case 'default':
             default:
-                $this->currentData = trim($this->currentData);
+                $this->currentData = trim((string)$this->currentData);
                 break;
         }
 
@@ -989,7 +1004,7 @@ class patConfiguration_Reader_XML extends patConfiguration_Reader
 
                 flock($fp, LOCK_UN);
                 fclose($fp);
-                xml_parser_free($this->parsers[$parserCount]);
+                $this->freeParser($this->parsers[$parserCount]);
 
                 return patErrorManager::raiseError(
                     PATCONFIGURATION_ERROR_CONFIG_INVALID,
@@ -1002,9 +1017,23 @@ class patConfiguration_Reader_XML extends patConfiguration_Reader
 
         flock($fp, LOCK_UN);
         fclose($fp);
-        xml_parser_free($this->parsers[$parserCount]);
+        $this->freeParser($this->parsers[$parserCount]);
 
         return true;
+    }
+
+    /**
+     * free a parser
+     *
+     * xml_parser_free() has no effect since PHP 8.0 and is deprecated since PHP 8.5
+     *
+     * @param resource $parser
+     */
+    public function freeParser($parser)
+    {
+        if (PHP_VERSION_ID < 80000) {
+            xml_parser_free($parser);
+        }
     }
 
     /**
@@ -1053,17 +1082,10 @@ class patConfiguration_Reader_XML extends patConfiguration_Reader
     {
         //  init XML Parser
         $parser = xml_parser_create($this->configObj->encoding);
-        xml_set_object($parser, $this);
 
-        if (version_compare(phpversion(), '5.0.0b') == -1) {
-            xml_set_element_handler($parser, 'startElement', 'endElement');
-            xml_set_character_data_handler($parser, 'characterData');
-            xml_set_external_entity_ref_handler($parser, 'externalEntity');
-        } else {
-            xml_set_element_handler($parser, array($this, 'startElement'), array($this, 'endElement'));
-            xml_set_character_data_handler($parser, array($this, 'characterData'));
-            xml_set_external_entity_ref_handler($parser, array($this, 'externalEntity'));
-        }
+        xml_set_element_handler($parser, array($this, 'startElement'), array($this, 'endElement'));
+        xml_set_character_data_handler($parser, array($this, 'characterData'));
+        xml_set_external_entity_ref_handler($parser, array($this, 'externalEntity'));
 
         xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, false);
 

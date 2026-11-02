@@ -106,6 +106,13 @@ class patConfiguration
     public $conf = array();
 
     /**
+     * config values set by setConfigValue()
+     *
+     * @var array|null
+     */
+    public $currentConf;
+
+    /**
      * directory, where the configuration files are stored
      *
      * @var string
@@ -785,7 +792,7 @@ class patConfiguration
             //  array
             case 'array':
                 if (!is_array($value)) {
-                    if (trim($value)) {
+                    if (trim($value === null ? '' : $value)) {
                         $value = array($value);
                     } else {
                         $value = array();
